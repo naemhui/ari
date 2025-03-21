@@ -35,4 +35,16 @@ public class AggregatedData {
             throw new RuntimeException("AggregatedData JSON 직렬화 실패", e);
         }
     }
+
+    /**
+     * JSON 문자열을 AggregatedData 객체로 역직렬화합니다.
+     */
+    public static AggregatedData fromJson(String jsonData) {
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            return mapper.readValue(jsonData, AggregatedData.class);
+        } catch (Exception e) {
+            throw new RuntimeException("AggregatedData 역직렬화 실패", e);
+        }
+    }
 }
