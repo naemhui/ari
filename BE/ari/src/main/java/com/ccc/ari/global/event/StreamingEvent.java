@@ -3,9 +3,11 @@ package com.ccc.ari.global.event;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
+@NoArgsConstructor
 @Getter
 public class StreamingEvent {
 
