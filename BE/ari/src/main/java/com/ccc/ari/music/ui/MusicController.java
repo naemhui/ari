@@ -17,7 +17,7 @@ import java.util.Arrays;
 import java.util.List;
 
 @RestController
-@RequestMapping("/albums")
+@RequestMapping("/api/v1/albums")
 @RequiredArgsConstructor
 @Slf4j
 public class MusicController {
