@@ -16,6 +16,8 @@ import com.ccc.ari.music.infrastructure.track.JpaTrackRepository;
 import com.ccc.ari.music.ui.response.TrackPlayResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,8 +34,9 @@ public class MusicServiceImpl implements MusicService {
 
     private final JpaTrackRepository jpaTrackRepository;
     private final JpaAlbumRepository jpaAlbumRepository;
-    private final KafkaProducerService kafkaProducerService;
+    //private final KafkaProducerService kafkaProducerService;
     private final UploadAlbumService uploadAlbumService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     @Override
@@ -55,12 +58,16 @@ public class MusicServiceImpl implements MusicService {
                 .genreId(album.getGenre().getGenreId())
                 .genreName(album.getGenre().getGenreName())
                 .timestamp(Instant.now())
+                .memberId(23)
+                .nickname("정규현")
                 .build();
 
         log.info("타임스탬프 : {}", event.getTimestamp());
         log.info("트랙 제목 : {}", event.getTrackTitle());
 
-        kafkaProducerService.sendStreamingEvent(event);
+        eventPublisher.publishEvent(event);
+        log.info("이벤트가 성공적으로 발행되었습니다: 트랙 ID={}, 닉네임={}", event.getTrackId(), event.getNickname());
+        
 
         return TrackPlayResponse.builder()
                 .artist(album.getMember().getNickname())

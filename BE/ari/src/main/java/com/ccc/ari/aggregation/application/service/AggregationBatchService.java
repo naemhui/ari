@@ -52,14 +52,20 @@ public class AggregationBatchService {
 
         // 3. 집계 기준 별 AggregatedData 생성
         // TODO: 도메인 서비스를 활용하여 집계 기준 별 AggregatedData 생성 메소드 호출
-        AggregatedData aggregatedData = AggregatedData.builder()
-                .period(period)
-                .streamingLogs(rawLogs)
-                .build();
-        logger.info("AggregatedData 객체를 생성했습니다. JSON 출력: {}", aggregatedData.toJson());
+        try {
+            AggregatedData aggregatedData = AggregatedData.builder()
+                    .period(period)
+                    .streamingLogs(rawLogs)
+                    .build();
+            logger.debug("생성된 AggregatedData 상세 정보: {}", aggregatedData);
+            logger.info("AggregatedData 객체를 생성했습니다.");
 
-        // 4. AggregationCompletedEvent 발행
-        eventPublisher.publishEvent(new AggregationCompletedEvent(aggregatedData));
-        logger.info("AggregationCompletedEvent가 성공적으로 발행되었습니다.");
+            // 4. AggregationCompletedEvent 발행
+            eventPublisher.publishEvent(new AggregationCompletedEvent(aggregatedData));
+            logger.info("AggregationCompletedEvent가 성공적으로 발행되었습니다.");
+        } catch (Exception e) {
+            logger.error("AggregatedData 생성 중 오류 발생: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 }

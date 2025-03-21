@@ -21,7 +21,7 @@ public class StreamingEvent {
     private Integer memberId;
     private String nickname;
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    //@JsonFormat(shape = JsonFormat.Shape.STRING)
     private Instant timestamp;
 
     @Builder

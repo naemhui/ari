@@ -23,20 +23,20 @@ import java.util.Base64;
 public class IpfsClientImpl implements IpfsClient {
 
     private final String ipfsApiUrl;
-    private final String apiKey;
-    private final String apiKeySecret;
+    private final String jwtToken;
+    private final String gatewayDomain;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final Logger log = LoggerFactory.getLogger(IpfsClientImpl.class);
 
-    public IpfsClientImpl(@Value("${IPFS_API_URL}") String ipfsApiUrl,
-                          @Value("${INFURA_API_KEY}") String apiKey,
-                          @Value("${INFURA_API_KEY_SECRET}") String apiKeySecret) {
+    public IpfsClientImpl(@Value("${PINATA_ENDPOINT}") String ipfsApiUrl,
+                          @Value("${PINATA_JWT}") String jwtToken,
+                          @Value("${PINATA_GATEWAY}") String gatewayDomain) {
         this.restTemplate = new RestTemplate();
         this.ipfsApiUrl = ipfsApiUrl;
+        this.jwtToken = jwtToken;
+        this.gatewayDomain = gatewayDomain;
         this.objectMapper = new ObjectMapper();
-        this.apiKey = apiKey;
-        this.apiKeySecret = apiKeySecret;
     }
 
     /**
@@ -47,6 +47,7 @@ public class IpfsClientImpl implements IpfsClient {
      */
     public IpfsResponse save(String data) {
         log.info("IPFS에 데이터를 저장 중입니다...");
+
         // 1. multipart/form-data 요청 본문 생성
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         ByteArrayResource resource = new ByteArrayResource(data.getBytes(StandardCharsets.UTF_8)) {
@@ -57,25 +58,37 @@ public class IpfsClientImpl implements IpfsClient {
         };
         body.add("file", resource);
 
-        // 2. multipart/form-data용 헤더 설정 및 Basic Auth 헤더 추가
+        // Pinata V3 API의 경우 network 파라미터 추가
+        body.add("network", "public");  // public 네트워크 선택
+
+        // 2. multipart/form-data용 헤더 설정 및 JWT Bearer 인증 헤더 추가
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        headers.setBasicAuth(apiKey, apiKeySecret);
+        headers.set("Authorization", "Bearer " + jwtToken);
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
-        // 3. IPFS API 엔드포인트로 POST 요청 전송
-        ResponseEntity<String> response = restTemplate.postForEntity(ipfsApiUrl, requestEntity, String.class);
+        // 3. Pinata V3 API 엔드포인트로 POST 요청 전송
+        String pinataV3Endpoint = "https://uploads.pinata.cloud/v3/files";
+        ResponseEntity<String> response = restTemplate.postForEntity(pinataV3Endpoint, requestEntity, String.class);
+
         if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
             try {
-                // IPFS API 응답 JSON 파싱
-                // 응답 예시: {"Name":"data.json","Hash":"QmDummyCidExample","Size":"123"}
+                // Pinata V3 API 응답 JSON 파싱 - 새로운 응답 형식에 맞춤
+                // 응답 예시: {"data":{"id":"...","name":"file.txt","cid":"bafybeih...","size":4682779,"number_of_files":1,"mime_type":"text/plain","group_id":null}}
                 JsonNode root = objectMapper.readTree(response.getBody());
-                String cid = root.path("Hash").asText();
+
+                // 새로운 Pinata V3 API 응답 구조: data.cid에서 CID 추출
+                String cid = root.path("data").path("cid").asText();
                 if (cid == null || cid.isEmpty()) {
                     log.error("IPFS 응답에 CID가 포함되어 있지 않습니다.");
                     throw new RuntimeException("IPFS 응답에 CID가 포함되어 있지 않습니다.");
                 }
-                log.info("IPFS에 데이터 저장 성공. CID: {}", cid);
+
+                // 추가 정보 로깅 (선택 사항)
+                String fileName = root.path("data").path("name").asText();
+                long fileSize = root.path("data").path("size").asLong();
+                log.info("IPFS에 데이터 저장 성공. 파일명: {}, 크기: {} bytes, CID: {}", fileName, fileSize, cid);
+
                 return new IpfsResponse(cid);
             } catch (JsonProcessingException e) {
                 log.error("IPFS 응답 JSON 파싱 실패", e);
@@ -86,34 +99,28 @@ public class IpfsClientImpl implements IpfsClient {
             throw new RuntimeException("IPFS에 데이터 업로드 실패. 상태 코드: " + response.getStatusCode());
         }
     }
-    
+
     @Override
     public String get(String ipfsPath) {
-        // URL 빌더를 통해 쿼리 파라미터 설정
-        log.info("IPFS에서 데이터를 가져오는 중입니다. 경로: {}", ipfsPath);
-        String url = UriComponentsBuilder
-                .fromHttpUrl(ipfsApiUrl)
-                .queryParam("arg", ipfsPath)
-                .toUriString();
+        log.info("IPFS에서 공개 데이터를 가져오는 중입니다. CID: {}", ipfsPath);
 
-        // Basic 인증 헤더 생성
-        String auth = apiKey + ":" + apiKeySecret;
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Basic " + encodedAuth);
+        try {
+            // 1. Pinata 공개 게이트웨이 URL 구성
+            String gatewayUrl = "https://" + gatewayDomain + "/ipfs/" + ipfsPath;
 
-        // 헤더를 포함하는 HTTP 엔티티 생성 (본문은 필요없으므로 null 사용)
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
+            // 2. 단순 GET 요청 생성 및 전송 (공개 파일이므로 인증 불필요)
+            ResponseEntity<String> response = restTemplate.getForEntity(gatewayUrl, String.class);
 
-        // Infura의 GET API는 POST 방식으로 호출합니다.
-        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
-        if (response.getStatusCode() == HttpStatus.OK) {
-            log.info("IPFS 데이터 조회 성공. 응답 크기: {} bytes",
-                    response.getBody() != null ? response.getBody().length() : 0);
-            return response.getBody();
-        } else {
-            log.error("IPFS 컨텐츠 조회 실패. 상태 코드: {}", response.getStatusCode());
-            throw new RuntimeException("IPFS 컨텐츠 조회 실패: " + response.getStatusCode());
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                log.info("IPFS 데이터 조회 성공. 응답 크기: {} bytes", response.getBody().length());
+                return response.getBody();
+            } else {
+                log.error("IPFS 데이터 조회 실패. 상태 코드: {}", response.getStatusCode());
+                throw new RuntimeException("IPFS 데이터 조회 실패. 상태 코드: " + response.getStatusCode());
+            }
+        } catch (Exception e) {
+            log.error("IPFS 데이터 조회 중 오류 발생", e);
+            throw new RuntimeException("IPFS 데이터 조회 중 오류 발생: " + e.getMessage(), e);
         }
     }
 }

@@ -1,15 +1,25 @@
 package com.ccc.ari.aggregation.domain.vo;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import lombok.Builder;
 import lombok.Getter;
 
 import java.time.Instant;
 import java.util.Objects;
 
+@Builder
 @Getter
+@JsonDeserialize(builder = AggregationPeriod.AggregationPeriodBuilder.class)
 public class AggregationPeriod {
 
     private final Instant start;
     private final Instant end;
+
+    @JsonPOJOBuilder(withPrefix = "")
+    public static class AggregationPeriodBuilder {
+        // builder 구현
+    }
 
     public AggregationPeriod(Instant start, Instant end) {
         if(end.isBefore(start)) {
