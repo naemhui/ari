@@ -5,6 +5,8 @@ import lombok.Getter;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 
 @Getter
@@ -28,6 +30,15 @@ public class StreamingLog implements Serializable {
       this.memberNickname = memberNickname;
       this.trackId = trackId;
       this.trackTitle = trackTitle;
+    }
+
+    /**
+     * UTC 기준의 시간을 한국 시간으로 변환 후 포맷팅하여 반환합니다.
+     */
+    public String timestampToString() {
+        return timestamp
+                .atZone(ZoneId.of("Asia/Seoul"))
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 
     @Override
