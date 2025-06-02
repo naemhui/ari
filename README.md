@@ -1,7 +1,7 @@
 # 🎵 Ari - 블록체인 기반 음원 스트리밍 플랫폼
 
 <p align="center">
-  <img src="./readme/readme_img.png" width="800" alt="Ari Main Image"/>
+  <img src="./readme_img.png" width="800" alt="Ari Main Image"/>
 </p>
 
 불투명한 정산과 복잡한 음원 등록 과정을 개선하기 위한 탈중앙화 음원 플랫폼입니다.  
